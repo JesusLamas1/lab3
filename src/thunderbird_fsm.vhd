@@ -36,18 +36,18 @@
 --|					can be changed by the inputs
 --|					
 --|
---|                 xxx State Encoding key
+--|                 Binary State Encoding key
 --|                 --------------------
 --|                  State | Encoding
 --|                 --------------------
---|                  OFF   | 
---|                  ON    | 
---|                  R1    | 
---|                  R2    | 
---|                  R3    | 
---|                  L1    | 
---|                  L2    | 
---|                  L3    | 
+--|                  OFF   | 000
+--|                  ON    | 001
+--|                  RA    | 010
+--|                  RB    | 011
+--|                  RC    | 100
+--|                  LA    | 101
+--|                  LB    | 110
+--|                  LC    | 111
 --|                 --------------------
 --|
 --|
@@ -86,22 +86,54 @@ library ieee;
   use ieee.numeric_std.all;
  
 entity thunderbird_fsm is 
---  port(
-	
---  );
+	port (
+        i_clk, i_reset  : in    std_logic;
+        i_left, i_right : in    std_logic;
+        o_lights_L      : out   std_logic_vector(2 downto 0);
+        o_lights_R      : out   std_logic_vector(2 downto 0)
+    );
 end thunderbird_fsm;
 
 architecture thunderbird_fsm_arch of thunderbird_fsm is 
 
 -- CONSTANTS ------------------------------------------------------------------
-  
+-- create register signals with default state off (000)
+	signal f_Q,f_Q_next: STD_LOGIC_VECTOR (2 downto 0) := "000";
+	
+
 begin
 
 	-- CONCURRENT STATEMENTS --------------------------------------------------------	
+	-- Next state logic using prelab eqs
+	f_Q_next(0) <= ( i_left AND (not f_Q(0)) AND (not f_Q(1))AND (not f_Q(2)) ) OR ( (not f_Q(0)) AND f_Q(1))  ;--s0 next eq
+	f_Q_next(1) <= ( i_right AND (not i_left) AND (not f_Q(0)) AND (not f_Q(1))AND (not f_Q(2)) ) OR ( (not f_Q(0)) AND f_Q(1) ) OR ( f_Q(0) AND (not f_Q(1)) AND f_Q(2) ) ;
+	f_Q_next(2) <= ( i_left AND (not i_right) AND (not f_Q(0)) AND (not f_Q(1)) AND (not f_Q(2)) ) OR ( f_Q(0) AND f_Q(1) AND (not f_Q(2)) ) OR ( f_Q(0) AND (not f_Q(1)) AND f_Q(2) ) OR ( (not f_Q(0)) AND f_Q(1) AND f_Q(2) );
 	
     ---------------------------------------------------------------------------------
+	-- Output logic
+	--RA 
+	o_lights_R(0) <= ( (not f_Q(2)) AND (not f_Q(1)) AND f_Q(0) ) OR ( (not f_Q(2)) AND f_Q(1) ) OR ( f_Q(2) AND (not f_Q(1)) AND (not f_Q(0)) );
+	--RB
+	o_lights_R(1) <= ( f_Q(0) AND (not f_Q(1)) AND (not f_Q(2)) ) OR ( f_Q(0) AND f_Q(1) AND (not f_Q(2)) ) OR ( (not f_Q(0)) AND (not f_Q(1)) AND f_Q(2) );
+	--RC
+	o_lights_R(2) <= ( f_Q(0) AND (not f_Q(1)) AND (not f_Q(2)) ) OR ( (not f_Q(0)) AND (not f_Q(1)) AND f_Q(2) );
+	--LA
+	o_lights_L(0) <= ( (not f_Q(1)) AND f_Q(0) ) OR ( f_Q(2) AND f_Q(1) );
+	--LB
+	o_lights_L(1) <= ( (not f_Q(2)) AND (not f_Q(1)) AND f_Q(0) ) OR ( f_Q(2) AND f_Q(1) );
+	--LC
+	o_lights_L(2) <= ( (not f_Q(2)) AND (not f_Q(1)) AND f_Q(0) ) OR ( f_Q(2) AND f_Q(1) AND f_Q(0) );
 	
 	-- PROCESSES --------------------------------------------------------------------
+    -- state memory w/ asynchronous reset ---------------
+	register_proc : process (i_clk, i_reset)
+	begin
+		if i_reset = '1' then
+        f_Q <= "000";        -- reset state is lights off (state 0/000)
+        elsif (rising_edge(i_clk)) then
+            f_Q <= f_Q_next;    -- next state becomes current state
+        end if;
+	end process register_proc;
     
 	-----------------------------------------------------					   
 				  
